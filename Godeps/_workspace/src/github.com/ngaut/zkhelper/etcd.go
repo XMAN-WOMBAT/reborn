@@ -359,7 +359,7 @@ func (e *etcdImpl) Create(wholekey string, value []byte, flags int32, aclv []zk.
 	tmp := (flags & zk.FlagEphemeral) != 0
 	ttl := uint64(MAX_TTL)
 	if tmp {
-		ttl = 5
+		ttl = 0
 	}
 
 	var resp *etcd.Response
