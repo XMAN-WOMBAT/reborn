@@ -234,7 +234,7 @@ func runDashboard(addr string, httpLogFile string) {
 	m.Map(stdlog.New(f, "[martini]", stdlog.LstdFlags))
 
 	binRoot := utils.GetExecutorPath()
-
+	
 	m.Use(martini.Static(filepath.Join(binRoot, "assets/statics")))
 	m.Use(render.Renderer(render.Options{
 		Directory:  filepath.Join(binRoot, "assets/template"),

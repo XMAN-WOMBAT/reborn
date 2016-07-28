@@ -5,12 +5,14 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/juju/errors"
 	"github.com/ngaut/log"
 	"github.com/ngaut/zkhelper"
 	"github.com/reborndb/go/errors2"
 	"github.com/reborndb/reborn/pkg/models"
+	"github.com/reborndb/reborn/pkg/utils"
 )
 
 type MigrateTaskInfo struct {
@@ -93,6 +95,85 @@ func (t *MigrateTask) migrateSingleSlot(slotId int, to int) error {
 	if !exists {
 		return errors.NotFoundf("group %d", to)
 	}
+
+/***************************************************************/
+	// make sure to group has at least one master server ---zjp 20160711
+
+	log.Warning("Get group %d has no master master not found")
+	groupTo, err :=models.GetGroup(t.coordConn, t.productName, to)
+	if err != nil {
+		log.Warning(err)
+		 return errors.Trace(err)
+	}
+	log.Warning("Get to master ")
+	toMaster, err := groupTo.Master(t.coordConn)
+	if err != nil {
+		log.Warning(err)
+		return errors.Trace(err)
+	}
+
+	if toMaster == nil {
+		log.Warning("to master not found")
+		return errors.NotFoundf("group %d has no master", to)
+	}
+	log.Warning("Get to master  != nil")
+
+	var perr error
+	for i := 0; i < haMaxRetryNum; i++ {
+		if perr = utils.Ping(toMaster.Addr, globalEnv.StoreAuth()); perr == nil {
+			break
+		}
+		
+		perr = errors.Trace(perr)
+		time.Sleep(time.Duration(haRetryDelay) * time.Second)
+	}
+
+	if perr != nil{
+		log.Warning(perr)
+		log.Warning("To master is not online")
+		return errors.Trace(perr)
+	}
+	groupFrom, err :=models.GetGroup(t.coordConn, t.productName, from)
+	if err != nil {
+		log.Warning(err)
+		 return errors.Trace(err)
+	}
+	log.Warning("Get from master ")
+	fromMaster, err := groupFrom.Master(t.coordConn)
+	if err != nil {
+		log.Warning(err)
+		return errors.Trace(err)
+	}
+
+	if fromMaster == nil {
+		log.Warning(" from master not found")
+		return errors.NotFoundf("group %d has no master", to)
+	}
+	log.Warning("Get from master  != nil")
+
+	var Fmerr error
+	for i := 0; i < haMaxRetryNum; i++ {
+		if Fmerr = utils.Ping(fromMaster.Addr, globalEnv.StoreAuth()); Fmerr == nil {
+			break
+		}
+		
+		Fmerr = errors.Trace(Fmerr)
+		time.Sleep(time.Duration(haRetryDelay) * time.Second)
+	}
+
+	if Fmerr != nil{
+		log.Warning(Fmerr)
+		log.Warning("From master is not online")
+		return errors.Trace(Fmerr)
+	}
+	groupFrom, gerr :=models.GetGroup(t.coordConn, t.productName, from)
+	if gerr != nil {
+		log.Warning(gerr)
+		 return errors.Trace(gerr)
+	}
+
+
+	/***************************************************************/
 
 	// modify slot status
 	if err := s.SetMigrateStatus(t.coordConn, from, to); err != nil {

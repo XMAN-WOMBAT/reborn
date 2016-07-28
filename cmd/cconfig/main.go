@@ -26,6 +26,8 @@ var (
 	globalConn zkhelper.Conn
 	livingNode string
 	pidFile    string
+	haMaxRetryNum = 3
+	haRetryDelay  = 1
 )
 
 type Command struct {

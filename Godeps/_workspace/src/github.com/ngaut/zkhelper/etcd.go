@@ -29,7 +29,7 @@ func (c *PooledEtcdClient) Close() {
 }
 
 func (e *etcdImpl) Seq2Str(seq int64) string {
-	return fmt.Sprintf("%d", seq)
+	return fmt.Sprintf("%0.20d", seq)
 }
 
 type etcdImpl struct {
@@ -212,7 +212,6 @@ func (e *etcdImpl) watch(key string, children bool) (resp *etcd.Response, stat z
 				ch <- convertToZkEvent(key, resp, err)
 				return
 			}
-
 			if key == resp.Node.Key && originVal == string(resp.Node.Value) { //keep alive event
 				index++
 				continue

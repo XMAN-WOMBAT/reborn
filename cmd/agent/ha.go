@@ -94,6 +94,7 @@ func (t *haTask) check() error {
 
 	var crashSlaves []*models.Server
 	var crashMasters []*models.Server
+	var svrOnline []*models.Server
 	for i := 0; i < cnt; i++ {
 		v := <-ch
 		switch s := v.(type) {
@@ -103,6 +104,9 @@ func (t *haTask) check() error {
 				crashSlaves = append(crashSlaves, s)
 			} else if s.Type == models.SERVER_TYPE_MASTER {
 				crashMasters = append(crashMasters, s)
+			}else if s.Type == models.SERVER_TYPE_OFFLINE{
+				log.Infof("Server %s in group %d is already start append", s.Addr, s.GroupId)
+				svrOnline = append(svrOnline,s)
 			}
 		case error:
 			err = errors.Trace(s)
@@ -132,15 +136,25 @@ func (t *haTask) check() error {
 		}
 	}
 
+	for _, s := range svrOnline{
+		log.Infof("Server %s in group %d is already start", s.Addr, s.GroupId)
+		group := models.NewServerGroup(globalEnv.ProductName(), s.GroupId)
+
+		s.Type = models.SERVER_TYPE_SLAVE
+
+		if err := group.AddServer(globalConn, s, globalEnv.StoreAuth()); err != nil {
+			return errors.Trace(err)
+		}
+	}
 	return nil
 }
 
 func (t *haTask) checkGroupServer(s *models.Server, ch chan<- interface{}) {
 	// we don't check offline server
-	if s.Type == models.SERVER_TYPE_OFFLINE {
+	/*if s.Type == models.SERVER_TYPE_OFFLINE {
 		ch <- nil
 		return
-	}
+	}*/
 
 	var err error
 	for i := 0; i < haMaxRetryNum; i++ {
@@ -152,7 +166,12 @@ func (t *haTask) checkGroupServer(s *models.Server, ch chan<- interface{}) {
 		time.Sleep(time.Duration(haRetryDelay) * time.Second)
 	}
 
-	if err == nil {
+	if err == nil && s.Type == models.SERVER_TYPE_OFFLINE{
+		ch <- s
+		return
+	}
+
+	if err == nil && s.Type != models.SERVER_TYPE_OFFLINE{
 		ch <- nil
 		return
 	}
